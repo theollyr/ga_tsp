@@ -19,8 +19,12 @@ function run_ga(x, y, NIND, MAXGEN, NVAR, ELITIST, STOP_PERCENTAGE, PR_CROSS, PR
 % {NIND MAXGEN NVAR ELITIST STOP_PERCENTAGE PR_CROSS PR_MUT CROSSOVER LOCALLOOP}
 
 
+        global TourSize;
+        TourSize = 10;
+
+        parent_selection = 'ranking';
         fitness_fun = 'tspfun';
-        ind_repre = 1;
+        ind_repre = 2;
         
         if ind_repre == 2
             fitness_fun = 'path_fitness';
@@ -79,11 +83,19 @@ function run_ga(x, y, NIND, MAXGEN, NVAR, ELITIST, STOP_PERCENTAGE, PR_CROSS, PR
 
             if (sObjV(stopN)-sObjV(1) <= 1e-15)
                   break;
-            end          
-        	%assign fitness values to entire population
-        	FitnV=ranking(ObjV);
-        	%select individuals for breeding
-        	SelCh=select('sus', Chrom, FitnV, GGAP);
+            end
+            
+            switch parent_selection
+                case 'ranking'
+                    % assign fitness values to entire population
+                    FitnV=ranking(ObjV);
+                    %select individuals for breeding
+                    SelCh=select('sus', Chrom, FitnV, GGAP);
+                    
+                case 'tournament'
+                    SelCh = select('tournament', Chrom, ObjV, GGAP);
+            end
+            
         	%recombine individuals (crossover)
             SelCh = recombin(CROSSOVER,SelCh,PR_CROSS);
             SelCh=mutateTSP('inversion',SelCh,PR_MUT,ind_repre);
