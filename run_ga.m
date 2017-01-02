@@ -16,13 +16,24 @@ function run_ga(x, y, NIND, MAXGEN, NVAR, ELITIST, STOP_PERCENTAGE, PR_CROSS, PR
 % CROSSOVER: the crossover operator
 % calculate distance matrix between each pair of cities
 % ah1, ah2, ah3: axes handles to visualise tsp
-{NIND MAXGEN NVAR ELITIST STOP_PERCENTAGE PR_CROSS PR_MUT CROSSOVER LOCALLOOP}
+% {NIND MAXGEN NVAR ELITIST STOP_PERCENTAGE PR_CROSS PR_MUT CROSSOVER LOCALLOOP}
 
+
+        fitness_fun = 'tspfun';
+        ind_repre = 1;
+        
+        if ind_repre == 2
+            fitness_fun = 'path_fitness';
+            CROSSOVER = 'perform_scx';
+        end
 
         GGAP = 1 - ELITIST;
         mean_fits=zeros(1,MAXGEN+1);
         worst=zeros(1,MAXGEN+1);
+        
+        global Dist
         Dist=zeros(NVAR,NVAR);
+        
         for i=1:size(x,1)
             for j=1:size(y,1)
                 Dist(i,j)=sqrt((x(i)-x(j))^2+(y(i)-y(j))^2);
@@ -30,15 +41,22 @@ function run_ga(x, y, NIND, MAXGEN, NVAR, ELITIST, STOP_PERCENTAGE, PR_CROSS, PR
         end
         % initialize population
         Chrom=zeros(NIND,NVAR);
-        for row=1:NIND
-        	Chrom(row,:)=path2adj(randperm(NVAR));
-            %Chrom(row,:)=randperm(NVAR);
+        
+        if ind_repre == 1
+            for row=1:NIND
+                Chrom(row,:)=path2adj(randperm(NVAR));
+            end
+        else
+            for row=1:NIND
+                Chrom(row,:)=randperm(NVAR);
+            end
         end
+        
         gen=0;
         % number of individuals of equal fitness needed to stop
         stopN=ceil(STOP_PERCENTAGE*NIND);
         % evaluate initial population
-        ObjV = tspfun(Chrom,Dist);
+        ObjV = feval(fitness_fun, Chrom, Dist);
         best=zeros(1,MAXGEN);
         % generational loop
         while gen<MAXGEN
@@ -53,7 +71,11 @@ function run_ga(x, y, NIND, MAXGEN, NVAR, ELITIST, STOP_PERCENTAGE, PR_CROSS, PR
                 end
             end
             
-            visualizeTSP(x,y,adj2path(Chrom(t,:)), minimum, ah1, gen, best, mean_fits, worst, ah2, ObjV, NIND, ah3);
+            if ind_repre == 1
+                visualizeTSP(x,y,adj2path(Chrom(t,:)), minimum, ah1, gen, best, mean_fits, worst, ah2, ObjV, NIND, ah3);
+            else
+                visualizeTSP(x,y,Chrom(t,:), minimum, ah1, gen, best, mean_fits, worst, ah2, ObjV, NIND, ah3);
+            end
 
             if (sObjV(stopN)-sObjV(1) <= 1e-15)
                   break;
@@ -64,9 +86,9 @@ function run_ga(x, y, NIND, MAXGEN, NVAR, ELITIST, STOP_PERCENTAGE, PR_CROSS, PR
         	SelCh=select('sus', Chrom, FitnV, GGAP);
         	%recombine individuals (crossover)
             SelCh = recombin(CROSSOVER,SelCh,PR_CROSS);
-            SelCh=mutateTSP('inversion',SelCh,PR_MUT);
+            SelCh=mutateTSP('inversion',SelCh,PR_MUT,ind_repre);
             %evaluate offspring, call objective function
-        	ObjVSel = tspfun(SelCh,Dist);
+        	ObjVSel = feval(fitness_fun, SelCh, Dist);
             %reinsert offspring into population
         	[Chrom ObjV]=reins(Chrom,SelCh,1,1,ObjV,ObjVSel);
             
