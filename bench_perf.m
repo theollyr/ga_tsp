@@ -142,6 +142,9 @@ function bench_perf( ...
                     algon = algon + 1;
                     
                     mkdir(algo_dir);
+                    
+                    AlgoBestMF = Inf;
+                    AlgoBestN = 0;
 
                     runn = 0;
                     for NInd = NInds
@@ -156,8 +159,6 @@ function bench_perf( ...
                                             run_name = sprintf('run%d', runn);
                                             run_dir = fullfile(algo_dir, run_name);
                                             mkdir(run_dir);
-                                            
-                                            runn = runn + 1;
 
                                             for r = 1:NRuns
                                                 [PathTmp, BestFTmp, BestFVTmp, MeanFVTmp, WorstFVTmp] = perform_run(...
@@ -178,8 +179,15 @@ function bench_perf( ...
 
                                             MeanFitness = Fitnesses / NRuns;
                                             
+                                            if MeanFitness < AlgoBestMF
+                                                AlgoBestMF = MeanFitness;
+                                                AlgoBestN = runn;
+                                            end
+                                            
                                             fprintf(report_file, '%3d - NInd: %3d, MaxGen: %3d, PXover: %.2f, PMut: %.2f, Elite: %.2f, StopPercentage: %.2f; BestF: %.4f, MeanF: %.4f\n', ...
                                                 runn, NInd, MaxGen, PXover, PMut, Elite, StopPercentage, BestFitness, MeanFitness);
+                                            
+                                            runn = runn + 1;
 
                                             result_file = fullfile(run_dir, 'result.txt');
                                             path_file = fullfile(run_dir, 'path.pdf');
@@ -225,6 +233,12 @@ function bench_perf( ...
                             end
                         end
                     end
+                    
+                    best_run_file = fopen(fullfile(algo_dir, 'best_run.txt'), 'w');
+                    fprintf(best_run_file, 'Best run: run%d\n', AlgoBestN);
+                    fclose(best_run_file);
+                    
+                    fprintf(report_file, 'Best run: %d\n', AlgoBestN);
                 end
             end
         end
