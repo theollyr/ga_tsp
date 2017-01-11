@@ -8,11 +8,11 @@ function [ Path, BestFitness, BestFV, MeanFV, WorstFV ] = perform_run( ...
     NInd, ...
     MaxGen, ...
     PXover, ...
-    PMut, ...
+    PMut, ...   
     Elite, ...
     StopPercentage)
 
-%PERFORM_RUN Perform a run of GA
+%PERFORM_RUN Perform a run of GA (based on run_ga.m)
 %   Input args:
 %   * Repre - used encoding (adj or path)
 %   * ParSel - parent selection method; might be in three forms:
@@ -22,9 +22,7 @@ function [ Path, BestFitness, BestFV, MeanFV, WorstFV ] = perform_run( ...
 %       [1, _tournament size_] - tournament method
 %       [2] - proportional method
 %   * SurvSel - survivor selection (insertion) method. Scalar of:
-%       [_kind of insertion_, _rate of offspring_]
-%           kind of insertion can be: 0 - uniform; or 1 - fitness-based.
-%           rate of offspring is a % of population
+%       0 - elitism only, 1 - elitism and mu+lambda selection
 %   * NCities - number of cities
 %   * Distances - calculated distance matrix
 %   * NInd - size of the population
@@ -47,8 +45,9 @@ function [ Path, BestFitness, BestFV, MeanFV, WorstFV ] = perform_run( ...
 
     Chrom = zeros(NInd,NCities);
     
-    fitness_fun = "tspfun";
-    xover_fun = "xalt_edges";
+    fitness_fun = 'tspfun';
+    xover_fun = 'xalt_edges';
+    mut_fun = 'inversion';
     
     switch Repre
         case 'adj'
@@ -60,8 +59,9 @@ function [ Path, BestFitness, BestFV, MeanFV, WorstFV ] = perform_run( ...
             
         case 'path'
             Repre = 2;
-            fitness_fun = "path_fitness";
-            xover_fun = "perform_scx";
+            fitness_fun = 'path_fitness';
+            xover_fun = 'perform_scx';
+            mut_fun = 'reciprocal_exchange';
             
             for row = 1:NInd
                 Chrom(row, :) = randperm(NCities);
@@ -82,12 +82,12 @@ function [ Path, BestFitness, BestFV, MeanFV, WorstFV ] = perform_run( ...
     
     % generational loop
     gen = 0;
-    while gen < MaxGen
+    while gen < MaxGen-1
         sObjV = sort(ObjV);
-        BestFV(gen + 1) = min(ObjV);
+        BestFV(gen + 1) = sObjV(1); %min(ObjV);
         BestFitness = BestFV(gen + 1);
         MeanFV(gen + 1) = mean(ObjV);
-        WorstFV(gen + 1) = max(ObjV);
+        WorstFV(gen + 1) = sObjV(end); %max(ObjV);
         
         for t = 1:size(ObjV, 1)
             if (ObjV(t) == BestFitness)
@@ -120,20 +120,41 @@ function [ Path, BestFitness, BestFV, MeanFV, WorstFV ] = perform_run( ...
 
         % recombine individuals (crossover)
         SelCh = recombin(xover_fun, SelCh, PXover);
-        SelCh = mutateTSP('inversion', SelCh, PMut, Repre);
+        SelCh = mutateTSP(mut_fun, SelCh, PMut, Repre);
         
-        % evaluate offspring, call objective function
+        % evaluate offsprings, call objective function
         ObjVSel = feval(fitness_fun, SelCh, Dist);
         
-        % reinsert offspring into population
-        [Chrom, ObjV] = reins(Chrom, SelCh, 1, SurvSel, ObjV, ObjVSel);
+        % reinsert offsprings into population
+        switch SurvSel
+            case 0 %elitism
+                [Chrom, ObjV]=reins(Chrom,SelCh,1,1,ObjV,ObjVSel);
+            case 1 %mu+lambda with elitism
+                [Chrom, ObjV]=perform_mu_lambda_survival(Chrom,SelCh,ObjV,ObjVSel);
+        end
 
         % increment generation counter
         gen = gen + 1;
     end
     
-    gen = gen - 1;
-    BestFV = BestFV(1:gen);
-    MeanFV = MeanFV(1:gen);
-    WorstFV = WorstFV(1:gen);
+    %If the run was finished because of Maxgen: the last generation is not 
+    %even used (just thrown away), so there is actually Maxgen+1 with 
+    %gen < Maxgen condition => use gen < Maxgen-1 instead!
+    %Hence the last evaluation is here:
+    if (gen >= MaxGen-1)
+        BestFV(gen + 1) = min(ObjV);
+        BestFitness = BestFV(gen + 1);
+        MeanFV(gen + 1) = mean(ObjV);
+        WorstFV(gen + 1) = max(ObjV);
+
+        for t = 1:size(ObjV, 1)
+            if (ObjV(t) == BestFitness)
+                break;
+            end
+        end
+
+        Path = Chrom(t, :);
+    end
+
+
 end

@@ -24,6 +24,8 @@ function run_ga(x, y, NIND, MAXGEN, NVAR, ELITIST, STOP_PERCENTAGE, PR_CROSS, PR
 
         parent_selection = 'ranking';
         fitness_fun = 'tspfun';
+        survivor_selection = 'elitism';
+        mut_fun = 'inversion';
         ind_repre = 2;
 
         if ind_repre == 2
@@ -101,11 +103,19 @@ function run_ga(x, y, NIND, MAXGEN, NVAR, ELITIST, STOP_PERCENTAGE, PR_CROSS, PR
 
         	%recombine individuals (crossover)
             SelCh = recombin(CROSSOVER,SelCh,PR_CROSS);
-            SelCh=mutateTSP('inversion',SelCh,PR_MUT,ind_repre);
-            %evaluate offspring, call objective function
+            %SelCh=mutateTSP('inversion',SelCh,PR_MUT,ind_repre);
+            SelCh=mutateTSP(mut_fun,SelCh,PR_MUT,ind_repre);
+            %evaluate offsprings, call objective function
         	ObjVSel = feval(fitness_fun, SelCh, Dist);
-            %reinsert offspring into population
-        	[Chrom ObjV]=reins(Chrom,SelCh,1,1,ObjV,ObjVSel);
+            
+            %reinsert offsprings into population
+            switch survivor_selection
+                case 'elitism'
+                   [Chrom, ObjV]=reins(Chrom,SelCh,1,1,ObjV,ObjVSel);
+                case 'mu_lambda'
+                   [Chrom, ObjV]=perform_mu_lambda_survival(Chrom,SelCh,ObjV,ObjVSel);
+            end
+            
 
             Chrom = tsp_ImprovePopulation(NIND, NVAR, Chrom,LOCALLOOP,Dist);
         	%increment generation counter

@@ -11,8 +11,7 @@ function bench_perf( ...
     MaxGens, ...
     PXovers, ...
     PMuts, ...
-    Elites, ...
-    StopPercentages)
+    Elites)
 %BENCH_PERF Benchmark performance
 %   Runs benchmark for multiple datasets with various algorithm setups
 %   and parameters.
@@ -23,14 +22,12 @@ function bench_perf( ...
 %   * NRuns - number of runs per one setup
 %   * Repres - array of strings with encodings to try out
 %   * ParSels - matrix with parent selection setups to use (setup per row)
-%   * SurvSels - matrix with survivor selection setups to use (setup per
-%     row)
+%   * SurvSels - array with survival selection method
 %   * NInds - array with generation sizes
 %   * MaxGens - array with maximal number of generations to use
 %   * PXovers - array with values of xover probability
 %   * PMuts - array with values of mutation probability
 %   * Elites - array with values of elite percentage
-%   * StopPercentages - array with values of stop percentages
 %
 %   The function creates the following file structure
 %   - OutDir/
@@ -77,20 +74,19 @@ function bench_perf( ...
                     parDesc = sprintf('parent selection method: tournament (size %d)', parSel(2));
                     
                 case 2
-                    parDesc = 'parent selection method: roulette';
+                    parDesc = 'parent selection method: proportional';
             end
             
-            for survSelIdx = 1:size(SurvSels, 1)
-                survSel = SurvSels(survSelIdx, :);
+            for survSel = SurvSels
                 
-                if survSel(1) == 0
-                    survKind = 'uniform';
+                if survSel == 0
+                    survKind = 'elitism';
                 else
-                    survKind = 'fitness-based';
+                    survKind = 'mu+lambda with elitism';
                 end
                 
-                fprintf(report_file, '%d - %s encoding, %s, insertion type: %s, rate of offspring to be inserted: %.4f\n', ...
-                    algon, repre, parDesc, survKind, survSel(2));
+                fprintf(report_file, '%d - %s encoding, %s, survivor selection type: %s,\n', ...
+                    algon, repre, parDesc, survKind);
                 
                 algon = algon + 1;
             end
@@ -133,8 +129,7 @@ function bench_perf( ...
             for parSelIdx = 1:size(ParSels, 1)
                 parSel = ParSels(parSelIdx, :);
 
-                for survSelIdx = 1:size(SurvSels, 1)
-                    survSel = SurvSels(survSelIdx, :);
+                for survSel = SurvSels
 
                     fprintf(report_file, '\nAlgorithm %d runs:\n', algon);
                     algo_name = sprintf('algo%d', algon);
@@ -143,7 +138,7 @@ function bench_perf( ...
                     
                     mkdir(algo_dir);
                     
-                    AlgoBestMF = Inf;
+                    AlgoBestMBF = Inf;
                     AlgoBestN = 0;
 
                     runn = 0;
@@ -152,82 +147,88 @@ function bench_perf( ...
                             for PXover = PXovers
                                 for PMut = PMuts
                                     for Elite = Elites
-                                        for StopPercentage = StopPercentages
-                                            BestFitness = Inf;
-                                            Fitnesses = 0.0;
+                                        
+                                        BestBestFitness = Inf;
+                                        WorstBestFitness = 0.0;
+                                        BestFitnesses = 0.0;
 
-                                            run_name = sprintf('run%d', runn);
-                                            run_dir = fullfile(algo_dir, run_name);
-                                            mkdir(run_dir);
+                                        run_name = sprintf('run%d', runn);
+                                        run_dir = fullfile(algo_dir, run_name);
+                                        mkdir(run_dir);
 
-                                            for r = 1:NRuns
-                                                [PathTmp, BestFTmp, BestFVTmp, MeanFVTmp, WorstFVTmp] = perform_run(...
-                                                    repre, parSel, survSel, ...
-                                                    NCities, Distances, NInd, MaxGen, PXover, PMut, Elite, StopPercentage);
+                                        for r = 1:NRuns
+                                            [PathTmp, BestFTmp, BestFVTmp, MeanFVTmp, WorstFVTmp] = perform_run(...
+                                                repre, parSel, survSel, ...
+                                                NCities, Distances, NInd, MaxGen, PXover, PMut, Elite, .95);
 
-                                                Fitnesses = Fitnesses + BestFTmp;
+                                            BestFitnesses = BestFitnesses + BestFTmp;
 
-                                                if BestFTmp < BestFitness
-                                                    Path = PathTmp;
-                                                    BestFV = BestFVTmp;
-                                                    MeanFV = MeanFVTmp;
-                                                    WorstFV = WorstFVTmp;
+                                            if BestFTmp < BestBestFitness
+                                                Path = PathTmp;
+                                                BestFV = BestFVTmp;
+                                                MeanFV = MeanFVTmp;
+                                                WorstFV = WorstFVTmp;
 
-                                                    BestFitness = BestFTmp;
-                                                end
-                                            end
-
-                                            MeanFitness = Fitnesses / NRuns;
-                                            
-                                            if MeanFitness < AlgoBestMF
-                                                AlgoBestMF = MeanFitness;
-                                                AlgoBestN = runn;
+                                                BestBestFitness = BestFTmp;
                                             end
                                             
-                                            fprintf(report_file, '%3d - NInd: %3d, MaxGen: %3d, PXover: %.2f, PMut: %.2f, Elite: %.2f, StopPercentage: %.2f; BestF: %.4f, MeanF: %.4f\n', ...
-                                                runn, NInd, MaxGen, PXover, PMut, Elite, StopPercentage, BestFitness, MeanFitness);
-                                            
-                                            runn = runn + 1;
-
-                                            result_file = fullfile(run_dir, 'result.txt');
-                                            path_file = fullfile(run_dir, 'path.pdf');
-                                            fitness_file = fullfile(run_dir, 'fitness.pdf');
-
-                                            result_file = fopen(result_file, 'w');
-                                            
-                                            fprintf(result_file, 'Parameters:\n\n');
-                                            fprintf(result_file, 'Generation size: %d\n', NInd);
-                                            fprintf(result_file, 'Maximum generations: %d\n', MaxGen);
-                                            fprintf(result_file, 'Xover probability: %.2f\n', PXover);
-                                            fprintf(result_file, 'Mutation probability: %.2f\n', PMut);
-                                            fprintf(result_file, 'Elite %%: %.2f\n', Elite);
-                                            fprintf(result_file, 'Stop %%: %.2f\n', StopPercentage);
-                                            
-                                            fprintf(result_file, '\nResults:\n\n');
-                                            fprintf(result_file, 'Best fitness found: %.4f\n', BestFitness);
-                                            fprintf(result_file, 'Mean fitness: %.4f\n', MeanFitness);
-                                            
-                                            fclose(result_file);
-                                            
-                                            figure('visible', 'off');
-                                            plot(x(Path), y(Path), 'ko-', 'MarkerFaceColor', 'Black');
-                                            hold on;
-                                            plot([x(Path(end)) x(Path(1))], [y(Path(end)) y(Path(1))], 'ko-');
-                                            hold off;
-                                            saveas(gcf, path_file, 'pdf');
-                                            close;
-                                            
-                                            figure('visible', 'off');
-                                            plot(BestFV, 'r');
-                                            hold on;
-                                            plot(MeanFV, 'b');
-                                            plot(WorstFV, 'g');
-                                            hold off;
-                                            xlabel('Generation');
-                                            ylabel('Distance (Min. - Mean - Max.)');
-                                            saveas(gcf, fitness_file, 'pdf');
-                                            close;
+                                            if BestFTmp > WorstBestFitness
+                                                WorstBestFitness = BestFTmp;
+                                            end
                                         end
+
+                                        MeanBestFitness = BestFitnesses / NRuns;
+
+                                        if MeanBestFitness < AlgoBestMBF
+                                            AlgoBestMBF = MeanBestFitness;
+                                            AlgoBestN = runn;
+                                        end
+
+                                        fprintf(report_file, ['%3d - NInd: %3d, MaxGen: %3d, PXover: %.2f, PMut: %.2f, Elite: %.2f;' ... 
+                                            'BestBF: %.4f, MeanBF: %.4f\n, WorstBF: %.4f'], ...
+                                            runn, NInd, MaxGen, PXover, PMut, Elite, BestBestFitness, MeanBestFitness, WorstBestFitness);
+
+                                        runn = runn + 1;
+
+                                        result_file = fullfile(run_dir, 'result.txt');
+                                        path_file = fullfile(run_dir, 'path.pdf');
+                                        fitness_file = fullfile(run_dir, 'fitness.pdf');
+
+                                        result_file = fopen(result_file, 'w');
+
+                                        fprintf(result_file, 'Parameters:\n\n');
+                                        fprintf(result_file, 'Generation size: %d\n', NInd);
+                                        fprintf(result_file, 'Maximum generations: %d\n', MaxGen);
+                                        fprintf(result_file, 'Xover probability: %.2f\n', PXover);
+                                        fprintf(result_file, 'Mutation probability: %.2f\n', PMut);
+                                        fprintf(result_file, 'Elite %%: %.2f\n', Elite);
+
+                                        fprintf(result_file, '\nResults:\n\n');
+                                        fprintf(result_file, 'Best BestFitness found: %.4f\n', BestBestFitness);
+                                        fprintf(result_file, 'Mean BestFitness: %.4f\n', MeanBestFitness);
+                                        fprintf(result_file, 'Worst BestFitness found: %.4f\n', WorstBestFitness);
+
+                                        fclose(result_file);
+
+                                        figure('visible', 'off');
+                                        plot(x(Path), y(Path), 'ko-', 'MarkerFaceColor', 'Black');
+                                        hold on;
+                                        plot([x(Path(end)) x(Path(1))], [y(Path(end)) y(Path(1))], 'ko-');
+                                        hold off;
+                                        saveas(gcf, path_file, 'pdf');
+                                        close;
+
+                                        figure('visible', 'off');
+                                        plot(BestFV, 'r');
+                                        hold on;
+                                        plot(MeanFV, 'b');
+                                        plot(WorstFV, 'g');
+                                        hold off;
+                                        xlabel('Generation');
+                                        ylabel('Distance (Min. - Mean - Max.)');
+                                        saveas(gcf, fitness_file, 'pdf');
+                                        close;
+
                                     end
                                 end
                             end
