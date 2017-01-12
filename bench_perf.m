@@ -46,6 +46,8 @@ function bench_perf( ...
 %           - algo2 ...
 %       - Dataset2 ...
 
+    tic
+
     report_dir = fullfile('.', OutDir);
     mkdir(report_dir)
     report_file = fopen(fullfile(report_dir, 'bench_report.txt'), 'w');
@@ -258,6 +260,9 @@ function bench_perf( ...
             end
         end
     end
+
+    elapsedTime = toc;
+    fprintf(report_file, '\n\nBenchmark elapsed time: %.4f seconds\n', elapsedTime);
 
     fclose(report_file);
 end
