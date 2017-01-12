@@ -48,7 +48,7 @@ function bench_perf( ...
 
     tic
 
-    report_dir = fullfile('.', OutDir);
+    report_dir = OutDir;
     mkdir(report_dir)
     report_file = fopen(fullfile(report_dir, 'bench_report.txt'), 'w');
 
