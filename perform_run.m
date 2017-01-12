@@ -82,7 +82,7 @@ function [ Path, BestFitness, BestFV, MeanFV, WorstFV ] = perform_run( ...
     
     % generational loop
     gen = 0;
-    while gen < MaxGen-1
+    while gen < MaxGen - 1
         sObjV = sort(ObjV);
         BestFV(gen + 1) = sObjV(1); %min(ObjV);
         BestFitness = BestFV(gen + 1);
@@ -141,7 +141,7 @@ function [ Path, BestFitness, BestFV, MeanFV, WorstFV ] = perform_run( ...
     %even used (just thrown away), so there is actually Maxgen+1 with 
     %gen < Maxgen condition => use gen < Maxgen-1 instead!
     %Hence the last evaluation is here:
-    if (gen >= MaxGen-1)
+    if (gen == MaxGen-1)
         BestFV(gen + 1) = min(ObjV);
         BestFitness = BestFV(gen + 1);
         MeanFV(gen + 1) = mean(ObjV);
@@ -155,6 +155,11 @@ function [ Path, BestFitness, BestFV, MeanFV, WorstFV ] = perform_run( ...
 
         Path = Chrom(t, :);
     end
-
+    
+    gen = gen + 1;
+    
+    BestFV = BestFV(1:gen);
+    MeanFV = MeanFV(1:gen);
+    WorstFV = WorstFV(1:gen);
 
 end
