@@ -49,17 +49,17 @@ function bench_perf( ...
     report_dir = fullfile('.', OutDir);
     mkdir(report_dir)
     report_file = fopen(fullfile(report_dir, 'bench_report.txt'), 'w');
-    
+
     fprintf(report_file, 'Benchmark run at %s\n\n', datestr(now));
     fprintf(report_file, 'Using these datasets: %s\n', strjoin(Datasets, ', '));
     fprintf(report_file, 'Number of runs per setup: %d\n', NRuns);
     fprintf(report_file, '\nAlgorithms:\n');
-    
+
     algon = 0;
     for repre = Repres
         for parSelIdx = 1:size(ParSels, 1)
             parSel = ParSels(parSelIdx, :);
-            
+
             switch parSel(1)
                 case 0
                     if parSel(3) == 0
@@ -67,55 +67,55 @@ function bench_perf( ...
                     else
                         rankMethod = 'non-linear';
                     end
-                    
+
                     parDesc = sprintf('parent selection method: ranking (selection pressure %.4f, %s)', parSel(2), rankMethod);
-                    
+
                 case 1
                     parDesc = sprintf('parent selection method: tournament (size %d)', parSel(2));
-                    
+
                 case 2
                     parDesc = 'parent selection method: proportional';
             end
-            
+
             for survSel = SurvSels
-                
+
                 if survSel == 0
                     survKind = 'elitism';
                 else
                     survKind = 'mu+lambda with elitism';
                 end
-                
-                fprintf(report_file, '%d - %s encoding, %s, survivor selection type: %s,\n', ...
+
+                fprintf(report_file, '%d - %s encoding, %s, survivor selection type: %s\n', ...
                     algon, repre, parDesc, survKind);
-                
+
                 algon = algon + 1;
             end
         end
     end
-    
+
     fprintf(report_file, '\nRuns:\n');
-    
+
     for datasetpath = Datasets
         dataset = load(datasetpath);
-        
+
         [~, datasetname, ~] = fileparts(char(datasetpath));
-        
+
         fprintf(report_file, '\nDataset %s:\n', datasetname);
-        
+
         dataset_dir = fullfile(report_dir, datasetname);
         mkdir(dataset_dir);
-        
+
         mx = max([dataset(:, 1); dataset(:, 2)]);
         x = dataset(:, 1) / mx;
         y = dataset(:, 2) / mx;
-        
+
         figure('visible', 'off');
         plot(x, y, 'ko');
         saveas(gcf, fullfile(dataset_dir, 'map.pdf'), 'pdf');
         close;
-        
+
         NCities = size(x, 1);
-        
+
         Distances = zeros(NCities);
 
         for i=1:NCities
@@ -123,7 +123,7 @@ function bench_perf( ...
                 Distances(i,j)=sqrt((x(i)-x(j))^2+(y(i)-y(j))^2);
             end
         end
-    
+
         algon = 0;
         for repre = Repres
             for parSelIdx = 1:size(ParSels, 1)
@@ -135,11 +135,11 @@ function bench_perf( ...
                     algo_name = sprintf('algo%d', algon);
                     algo_dir = fullfile(dataset_dir, algo_name);
                     algon = algon + 1;
-                    
+
                     mkdir(algo_dir);
-                    
-                    AlgoBestMBF = Inf;
-                    AlgoBestN = 0;
+
+                    AlgoStatF = [0.0 Inf Inf];
+                    AlgoStatN = zeros(1, 3);
 
                     runn = 0;
                     for NInd = NInds
@@ -147,7 +147,7 @@ function bench_perf( ...
                             for PXover = PXovers
                                 for PMut = PMuts
                                     for Elite = Elites
-                                        
+
                                         BestBestFitness = Inf;
                                         WorstBestFitness = 0.0;
                                         BestFitnesses = 0.0;
@@ -171,7 +171,7 @@ function bench_perf( ...
 
                                                 BestBestFitness = BestFTmp;
                                             end
-                                            
+
                                             if BestFTmp > WorstBestFitness
                                                 WorstBestFitness = BestFTmp;
                                             end
@@ -179,13 +179,23 @@ function bench_perf( ...
 
                                         MeanBestFitness = BestFitnesses / NRuns;
 
-                                        if MeanBestFitness < AlgoBestMBF
-                                            AlgoBestMBF = MeanBestFitness;
-                                            AlgoBestN = runn;
+                                        if WorstBestFitness > AlgoStatF(1)
+                                            AlgoStatF(1) = WorstBestFitness;
+                                            AlgoStatN(1) = runn;
                                         end
 
-                                        fprintf(report_file, ['%3d - NInd: %3d, MaxGen: %3d, PXover: %.2f, PMut: %.2f, Elite: %.2f;' ... 
-                                            'BestBF: %.4f, MeanBF: %.4f\n, WorstBF: %.4f'], ...
+                                        if MeanBestFitness < AlgoStatF(2)
+                                            AlgoStatF(2) = MeanBestFitness;
+                                            AlgoStatN(2) = runn;
+                                        end
+
+                                        if BestBestFitness < AlgoStatF(3)
+                                            AlgoStatF(3) = BestBestFitness;
+                                            AlgoStatN(3) = runn;
+                                        end
+
+                                        fprintf(report_file, ['%3d - NInd: %3d, MaxGen: %3d, PXover: %.2f, PMut: %.2f, Elite: %.2f; ' ...
+                                            'BestBF: %.4f, MeanBF: %.4f, WorstBF: %.4f\n'], ...
                                             runn, NInd, MaxGen, PXover, PMut, Elite, BestBestFitness, MeanBestFitness, WorstBestFitness);
 
                                         runn = runn + 1;
@@ -234,17 +244,21 @@ function bench_perf( ...
                             end
                         end
                     end
-                    
+
                     best_run_file = fopen(fullfile(algo_dir, 'best_run.txt'), 'w');
-                    fprintf(best_run_file, 'Best run: run%d\n', AlgoBestN);
+                    fprintf(best_run_file, 'Worst best fitness in run: %d\n', AlgoStatN(1));
+                    fprintf(best_run_file, 'Best MBF in run: %d\n', AlgoStatN(2));
+                    fprintf(best_run_file, 'Best best fitness in run: %d\n', AlgoStatN(3));
                     fclose(best_run_file);
-                    
-                    fprintf(report_file, 'Best run: %d\n', AlgoBestN);
+
+                    fprintf(report_file, 'Worst best fitness in run: %d; ', AlgoStatN(1));
+                    fprintf(report_file, 'Best MBF in run: %d; ', AlgoStatN(2));
+                    fprintf(report_file, 'Best best fitness in run: %d\n', AlgoStatN(3));
                 end
             end
         end
     end
-    
+
     fclose(report_file);
 end
 
