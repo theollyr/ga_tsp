@@ -75,7 +75,7 @@ function [ Path, BestFitness, BestFV, MeanFV, WorstFV ] = perform_run( ...
     WorstFV = zeros(1, MaxGen);
     
     % number of individuals of equal fitness needed to stop
-    stopN = ceil(StopPercentage * NCities);
+    stopN = ceil(StopPercentage * NInd);
     
     % evaluate initial population
     ObjV = feval(fitness_fun, Chrom, Dist);
