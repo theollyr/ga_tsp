@@ -142,6 +142,9 @@ function bench_perf( ...
 
                     AlgoStatF = [0.0 Inf Inf];
                     AlgoStatN = zeros(1, 3);
+                    
+                    algo_results_file = fopen(fullfile(algo_dir, 'results.tsv'), 'w');
+                    fprintf(algo_results_file, 'Run\tNInd\tMaxGen\tPXover\tPMut\tElite\tBestBF\tMeanBF\tWorstBF\n');
 
                     runn = 0;
                     for NInd = NInds
@@ -199,6 +202,10 @@ function bench_perf( ...
                                         fprintf(report_file, ['%3d - NInd: %3d, MaxGen: %3d, PXover: %.2f, PMut: %.2f, Elite: %.2f; ' ...
                                             'BestBF: %.4f, MeanBF: %.4f, WorstBF: %.4f\n'], ...
                                             runn, NInd, MaxGen, PXover, PMut, Elite, BestBestFitness, MeanBestFitness, WorstBestFitness);
+                                        
+                                        fprintf(algo_results_file, ...
+                                            '%d\t%d\t%d\t%.2f\t%.2f\t%.2f\t%.4f\t%.4f\t%.4f\t\n', ...
+                                            runn, NInd, MaxGen, PXover, PMut, Elite, BestBestFitness, MeanBestFitness, WorstBestFitness);
 
                                         runn = runn + 1;
 
@@ -246,6 +253,8 @@ function bench_perf( ...
                             end
                         end
                     end
+                    
+                    fclose(algo_results_file);
 
                     best_run_file = fopen(fullfile(algo_dir, 'best_run.txt'), 'w');
                     fprintf(best_run_file, 'Worst best fitness in run: %d\n', AlgoStatN(1));
